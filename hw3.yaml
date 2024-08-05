@@ -1,0 +1,225 @@
+- question: 1
+  answer: |
+    CREATE DATABASE chinook;
+    \c chinook
+    \i chinook_postgres.sql;
+
+- question: 2
+  answer: |
+    SELECT DISTINCT t.name
+    FROM track AS t
+    LEFT JOIN invoice_line AS il ON t.track_id = il.track_id
+    WHERE il.track_id IS NULL
+    ORDER BY t.name ASC;
+    
+
+- question: 3
+  answer: |
+    SELECT DISTINCT t.name
+    FROM track t 
+    WHERE t.track_id NOT IN (
+        SELECT pt.track_id
+        FROM playlist_track pt
+        JOIN playlist pl ON pt.playlist_id = pl.playlist_id
+        WHERE pl.name = '90’s Music'
+    )
+    ORDER BY t.name ASC;
+
+
+- question: 4
+  answer: |
+    SELECT DISTINCT(a.name)
+    FROM artist a
+    WHERE NOT EXISTS(
+        SELECT a.name
+        FROM album al, track t, genre g
+        WHERE a.artist_id = al.artist_id
+        AND al.album_id = t.album_id
+        AND t.genre_id = g.genre_id
+        AND g.name = 'Blues'
+    )
+    ORDER BY a.name;
+
+
+- question: 5
+  answer: |
+    SELECT DISTINCT(p.name)
+    FROM playlist p
+    WHERE NOT EXISTS(
+        SELECT p.name
+        FROM playlist_track pt, track t, genre g
+        WHERE p.playlist_id = pt.playlist_id
+        AND pt.track_id = t.track_id
+        AND t.genre_id = g.genre_id
+        AND (g.name = 'Rock' OR g.name = 'Blues')
+    )
+    ORDER BY p.name;
+
+- question: 6
+  answer: |
+    SELECT a.name
+    FROM artist a
+    INNER JOIN (
+        SELECT al.artist_id
+        FROM album al
+        INNER JOIN track t ON al.album_id = t.album_id
+        GROUP BY al.artist_id
+        HAVING COUNT(DISTINCT (t.genre_id)) >= 3
+    ) AS gcounts ON a.artist_id = gcounts.artist_id
+    ORDER BY a.name;
+    
+
+- question: 7
+  answer: |
+    CREATE DATABASE flights;
+    \c flights
+
+    CREATE TABLE MONTHS (
+        mid INTEGER PRIMARY KEY,
+        month TEXT
+    );
+
+    
+    CREATE TABLE WEEKDAYS (
+        did INTEGER PRIMARY KEY,
+        day_of_week TEXT
+    );
+
+    
+    CREATE TABLE CARRIERS (
+        cid VARCHAR(7) PRIMARY KEY,
+        name VARCHAR(83)
+    );
+
+    CREATE TABLE FLIGHTS (
+        fid INTEGER PRIMARY KEY,
+        month_id INTEGER,
+        day_of_month INTEGER,
+        day_of_week_id INTEGER,
+        carrier_id VARCHAR(7),
+        flight_num INTEGER,
+        origin_city VARCHAR(34),
+        origin_state VARCHAR(47),
+        dest_city VARCHAR(34),
+        dest_state VARCHAR(46),
+        departure_delay INTEGER,
+        taxi_out INTEGER,
+        arrival_delay INTEGER,
+        canceled INTEGER,
+        actual_time INTEGER,
+        distance INTEGER,
+        capacity INTEGER,
+        price INTEGER,
+        FOREIGN KEY (carrier_id) REFERENCES carriers (cid),
+        FOREIGN KEY (month_id) REFERENCES months (mid),
+        FOREIGN KEY (day_of_week_id) REFERENCES weekdays (did)
+    );
+
+    \copy WEEKDAYS FROM '/Users/manavjairam/Desktop/DS/DSC100/hw3/flights/weekdays.csv' WITH (FORMAT csv);
+    \copy MONTHS FROM '/Users/manavjairam/Desktop/DS/DSC100/hw3/flights/months.csv' WITH (FORMAT csv);
+    \copy CARRIERS FROM '/Users/manavjairam/Desktop/DS/DSC100/hw3/flights/carriers.csv' WITH (FORMAT csv);
+    \copy FLIGHTS FROM '/Users/manavjairam/Desktop/DS/DSC100/hw3/flights/flights-small.csv' WITH (FORMAT csv);
+
+- question: 8
+  answer: |
+    WITH maxtimes AS(
+        SELECT origin_city, max(actual_time) max_time 
+        FROM 
+        GROUP BY origin_city
+    )
+
+    SELECT DISTINCT(f.origin_city) AS origin_city, f.dest_city AS dest_city, f.actual_time AS time
+    FROM flights f,maxtimes
+    WHERE f.origin_city = maxtimes.origin_city and f.actual_time = maxtimes.max_time
+    ORDER BY f.origin_city ASC, f.dest_city DESC;
+    
+
+- question: 9
+  answer: |
+    SELECT DISTINCT(f.origin_city) as city
+    FROM flights f 
+    WHERE NOT EXISTS(
+        SELECT f2.actual_time
+        FROM flights f2
+        WHERE f2.actual_time >= 180
+        AND f.origin_city = f2.origin_city
+    )
+    ORDER BY city ASC;
+    
+
+- question: 10
+  answer: |
+    SELECT origin_city, percentage
+    FROM (
+        SELECT
+            f1.origin_city,
+            ROUND((SUM(CASE WHEN f1.actual_time < 180 AND f1.actual_time IS NOT NULL THEN 1 ELSE 0 END) * 100.0) / COUNT(f1.fid), 2) AS percentage
+        FROM flights f1
+        GROUP BY f1.origin_city
+    ) AS percentages
+    WHERE percentage IS NOT NULL
+    ORDER BY percentage ASC;
+
+
+
+- question: 11
+  answer: |
+    WITH sdf AS (
+        SELECT DISTINCT dest_city
+        FROM flights
+        WHERE origin_city = 'San Diego CA'
+    ),
+    indirect AS (
+        SELECT DISTINCT f1.dest_city
+        FROM flights f1
+        WHERE f1.dest_city <> 'San Diego CA'
+        AND EXISTS (
+            SELECT 1
+            FROM flights f2
+            WHERE f2.origin_city = 'San Diego CA'
+            AND f2.dest_city = f1.origin_city
+        )
+    )
+
+    SELECT dest_city AS city
+    FROM indirect
+    WHERE dest_city NOT IN (SELECT dest_city FROM sdf)
+    ORDER BY city ASC;
+    
+
+- question: 12.1
+  answer: |
+    SELECT DISTINCT c.name as carrier
+    FROM carriers c
+    WHERE c.cid IN (
+        SELECT f.carrier_id
+        FROM flights f
+        WHERE f.dest_city = 'San Francisco CA' 
+        AND f.origin_city = 'San Diego CA'
+    )
+    ORDER BY carrier ASC;
+    
+
+- question: 12.2
+  answer: |
+    SELECT DISTINCT c.name as carrier
+    FROM flights f, carriers c
+    WHERE f.carrier_id = c.cid
+    AND f.dest_city = 'San Francisco CA'
+    AND f.origin_city = 'San Diego CA'
+    ORDER BY carrier ASC;
+    
+
+- question: 13
+  answer: |
+    question,runtime,runtime_with_index
+    8,0.00,0.15
+    9,0.00,0.17
+    10,0.00,0.24
+    11,0.00,0.33
+    12.1,0.00,0.19
+    12.2,0.00,0.28
+  explanation: |
+    Indexing can improve performance, especially when it comes to searching and filtering over indexed columns
+    In Q8 and Q9, since we are filtering over origin city and actual time and joining, indexing on them helps improve the speed of queries
+    Similarly, in Q11 and 12 overall, indexing over origin_city and dest_city helps improve speed of queries
